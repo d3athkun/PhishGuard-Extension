@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhishGuard</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L3 7V12C3 16.55 7.08 20.74 12 22C16.92 20.74 21 16.55 21 12V7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="logo-text">PhishGuard</span>
+    </div>
+    <div class="status-dot" id="apiDot" title="API Status"></div>
+  </header>
+
+  <!-- Current Page Scan -->
+  <section class="card" id="autoScanCard">
+    <div class="card-label">CURRENT PAGE</div>
+    <div class="result-display" id="autoResult">
+      <div class="result-icon" id="autoIcon">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div class="result-text">
+        <div class="result-label" id="autoLabel">Scanning…</div>
+        <div class="result-url" id="autoUrl"></div>
+      </div>
+    </div>
+    <div class="confidence-bar-wrap" id="autoBarWrap" style="display:none">
+      <div class="confidence-bar-track">
+        <div class="confidence-bar-fill" id="autoBarFill"></div>
+      </div>
+      <span class="confidence-value" id="autoConfValue"></span>
+    </div>
+  </section>
+
+  <!-- Manual Check -->
+  <section class="card">
+    <div class="card-label">MANUAL CHECK</div>
+    <div class="input-row">
+      <input
+        type="text"
+        id="urlInput"
+        class="url-input"
+        placeholder="Paste any URL to check…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="check-btn" id="checkBtn">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M21 21L16.65 16.65M11 19C6.58 19 3 15.42 3 11C3 6.58 6.58 3 11 3C15.42 3 19 6.58 19 11C19 15.42 15.42 19 11 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Check
+      </button>
+    </div>
+
+    <!-- Manual Result -->
+    <div class="manual-result-wrap" id="manualResultWrap" style="display:none">
+      <div class="result-display" id="manualResult">
+        <div class="result-icon" id="manualIcon"></div>
+        <div class="result-text">
+          <div class="result-label" id="manualLabel"></div>
+          <div class="result-url" id="manualUrl"></div>
+        </div>
+      </div>
+      <div class="confidence-bar-wrap">
+        <div class="confidence-bar-track">
+          <div class="confidence-bar-fill" id="manualBarFill"></div>
+        </div>
+        <span class="confidence-value" id="manualConfValue"></span>
+      </div>
+    </div>
+    <div class="loading" id="manualLoading" style="display:none">
+      <div class="spinner"></div>
+      <span>Analysing…</span>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>Powered by ML · 549K URL dataset</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

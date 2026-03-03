@@ -1,0 +1,320 @@
+/* ─────────────────────────────────────────────────────────────
+   PhishGuard Extension Popup  –  popup.css
+   360px wide, dark theme, glassmorphism accents
+   ───────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --safe: #3fb950;
+    --danger: #f85149;
+    --warn: #d29922;
+    --blue: #58a6ff;
+    --accent: #1f6feb;
+    --radius: 10px;
+}
+
+body {
+    width: 360px;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    overflow: hidden;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--blue);
+    filter: drop-shadow(0 0 6px rgba(88, 166, 255, 0.5));
+}
+
+.logo-text {
+    font-size: 15px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--blue), #a5d6ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.3px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.4s;
+    box-shadow: 0 0 0 2px rgba(139, 148, 158, 0.2);
+}
+
+.status-dot.online {
+    background: var(--safe);
+    box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.25);
+}
+
+.status-dot.offline {
+    background: var(--danger);
+    box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.25);
+}
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.card {
+    margin: 10px 12px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.card-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+}
+
+/* ── Result Display ─────────────────────────────────────────── */
+.result-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.result-icon {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(139, 148, 158, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.result-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.result-icon.safe {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--safe);
+    box-shadow: 0 0 12px rgba(63, 185, 80, 0.2);
+}
+
+.result-icon.danger {
+    background: rgba(248, 81, 73, 0.15);
+    color: var(--danger);
+    box-shadow: 0 0 12px rgba(248, 81, 73, 0.2);
+}
+
+.result-icon.loading {
+    background: rgba(88, 166, 255, 0.1);
+    color: var(--blue);
+}
+
+.result-icon.offline {
+    background: rgba(139, 148, 158, 0.1);
+    color: var(--text-muted);
+}
+
+.result-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.result-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+}
+
+.result-label.safe {
+    color: var(--safe);
+}
+
+.result-label.danger {
+    color: var(--danger);
+}
+
+.result-url {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+}
+
+/* ── Confidence Bar ─────────────────────────────────────────── */
+.confidence-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.confidence-bar-track {
+    flex: 1;
+    height: 5px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.confidence-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 99px;
+    background: var(--blue);
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+}
+
+.confidence-bar-fill.safe {
+    background: var(--safe);
+}
+
+.confidence-bar-fill.danger {
+    background: var(--danger);
+}
+
+.confidence-value {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-width: 34px;
+    text-align: right;
+}
+
+/* ── Input Row ──────────────────────────────────────────────── */
+.input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.url-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.url-input::placeholder {
+    color: var(--text-muted);
+}
+
+.url-input:focus {
+    border-color: var(--accent);
+}
+
+.check-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.check-btn:hover {
+    background: #388bfd;
+}
+
+.check-btn:active {
+    transform: scale(0.97);
+}
+
+.check-btn:disabled {
+    background: var(--border);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+/* ── Manual Result ──────────────────────────────────────────── */
+.manual-result-wrap {
+    margin-top: 12px;
+}
+
+/* ── Loading Spinner ────────────────────────────────────────── */
+.loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.footer {
+    text-align: center;
+    padding: 8px 16px 12px;
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: 0.3px;
+}
