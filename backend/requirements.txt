@@ -7,3 +7,4 @@ scipy
 joblib
 matplotlib
 kagglehub
+gunicorn

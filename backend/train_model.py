@@ -1,11 +1,12 @@
 """
-train_model.py  (Improved v2)
-------------------------------
+train_model.py  (v3 — Multi-Model)
+------------------------------------
 Features:
   1. Dual TF-IDF  — char n-grams (3-5) + word n-grams (1-2) on tokenized URL
   2. 21 hand-crafted URL features (entropy, subdomain depth, brand keywords, etc.)
-  3. Trains Logistic Regression + Multinomial Naive Bayes, saves the best
-  4. Generates evaluation plots -> backend/plots/
+  3. Trains Logistic Regression + Multinomial Naive Bayes + Random Forest
+  4. Saves all 3 models individually + best as model.pkl
+  5. Generates evaluation plots -> backend/plots/
 
 Run:
     python train_model.py
@@ -21,6 +22,7 @@ from scipy.sparse import hstack, csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     classification_report, accuracy_score,
@@ -48,6 +50,8 @@ except Exception as e:
 if not csv_path or not os.path.exists(csv_path):
     candidates = [
         os.path.join(HERE, "..", "phishing website", "phishing_site_urls.csv"),
+        r"C:\Users\HP 840 g5\OneDrive\Documents\Saud\PhishGuard-Extension\phishing website\phishing_site_urls.csv",
+        r"C:\Users\HP 840 g5\.cache\kagglehub\datasets\taruntiwarihp\phishing-site-urls\versions\1\phishing_site_urls.csv",
         r"C:\Users\HP\Desktop\phishing website\phishing_site_urls.csv",
     ]
     csv_path = next((p for p in candidates if os.path.exists(p)), None)
@@ -193,17 +197,33 @@ results["MultinomialNB"] = (mnb, mnb_acc)
 print(f"    Accuracy: {mnb_acc:.4f}")
 print(classification_report(y_te, mnb_preds, target_names=["safe", "phishing"]))
 
+print("[*] Training Random Forest (100 trees, n_jobs=-1) ...")
+rf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, max_depth=20)
+rf.fit(X_tr, y_tr)
+rf_preds = rf.predict(X_te)
+rf_acc   = accuracy_score(y_te, rf_preds)
+results["RandomForest"] = (rf, rf_acc)
+print(f"    Accuracy: {rf_acc:.4f}")
+print(classification_report(y_te, rf_preds, target_names=["safe", "phishing"]))
+
 
 # ==============================================================================
-# 6.  SAVE BEST MODEL
+# 6.  SAVE ALL MODELS + BEST
 # ==============================================================================
 best_name, (best_model, best_acc) = max(results.items(), key=lambda x: x[1][1])
 print(f"\n[OK] Best model: {best_name}  (accuracy = {best_acc:.4f})")
 
-joblib.dump(best_model, os.path.join(HERE, "model.pkl"))
+# Save vectorizers (shared by all models)
 joblib.dump(char_tfidf, os.path.join(HERE, "char_vectorizer.pkl"))
 joblib.dump(word_tfidf, os.path.join(HERE, "word_vectorizer.pkl"))
-print(f"[OK] model.pkl, char_vectorizer.pkl, word_vectorizer.pkl  saved -> {HERE}")
+
+# Save each model individually
+joblib.dump(mnb, os.path.join(HERE, "model.pkl"))           # default / best
+joblib.dump(mnb, os.path.join(HERE, "model_mnb.pkl"))       # explicit MNB
+joblib.dump(lr,  os.path.join(HERE, "model_lr.pkl"))        # Logistic Regression
+joblib.dump(rf,  os.path.join(HERE, "model_rf.pkl"))        # Random Forest
+print(f"[OK] model.pkl, model_mnb.pkl, model_lr.pkl, model_rf.pkl saved -> {HERE}")
+print(f"[OK] char_vectorizer.pkl, word_vectorizer.pkl saved -> {HERE}")
 
 
 # ==============================================================================
@@ -212,7 +232,7 @@ print(f"[OK] model.pkl, char_vectorizer.pkl, word_vectorizer.pkl  saved -> {HERE
 PLOTS_DIR = os.path.join(HERE, "plots")
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
-COLORS = ["#1565c0", "#6a1b9a"]
+COLORS = ["#1565c0", "#6a1b9a", "#00695c"]
 CLASSES = ["safe", "phishing"]
 
 # -- helper: dark axes --
@@ -303,21 +323,25 @@ for name, (mdl, _) in results.items():
 
 metric_names = list(list(metrics_data.values())[0].keys())
 x = np.arange(len(metric_names))
-w = 0.35
-fig, ax = plt.subplots(figsize=(11, 5), facecolor="#0d1117")
-b1 = ax.bar(x - w/2, [metrics_data["LogisticRegression"][m] for m in metric_names],
-            w, label="Logistic Regression", color=COLORS[0], alpha=0.9)
-b2 = ax.bar(x + w/2, [metrics_data["MultinomialNB"][m] for m in metric_names],
-            w, label="Multinomial NB", color=COLORS[1], alpha=0.9)
-for bar in list(b1) + list(b2):
-    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.003,
-            f"{bar.get_height():.3f}", ha="center", va="bottom", color="white", fontsize=8.5)
+n_models = len(results)
+w = 0.25
+fig, ax = plt.subplots(figsize=(13, 5), facecolor="#0d1117")
+offsets = np.linspace(-(n_models-1)*w/2, (n_models-1)*w/2, n_models)
+bars_all = []
+for (name, _), offset, color in zip(results.items(), offsets, COLORS):
+    bars = ax.bar(x + offset, [metrics_data[name][m] for m in metric_names],
+                  w, label=name, color=color, alpha=0.9)
+    bars_all.append(bars)
+for bars in bars_all:
+    for bar in bars:
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.003,
+                f"{bar.get_height():.3f}", ha="center", va="bottom", color="white", fontsize=7.5)
 ax.set_xticks(x)
 ax.set_xticklabels(metric_names)
-ax.set_ylim(0.85, 1.02)
+ax.set_ylim(0.80, 1.04)
 ax.set_ylabel("Score", color="white")
 ax.legend(facecolor="#0d1117", labelcolor="white")
-dark_ax(ax, "Model Performance Comparison")
+dark_ax(ax, "Model Performance Comparison — LR vs MNB vs Random Forest")
 fig.patch.set_facecolor("#0d1117")
 plt.tight_layout()
 cmp_path = os.path.join(PLOTS_DIR, "model_comparison.png")

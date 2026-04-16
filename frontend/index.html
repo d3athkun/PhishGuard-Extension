@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhishGuard — Phishing URL Detector</title>
+  <meta name="description" content="Free real-time phishing website detector powered by machine learning. Paste any URL and instantly know if it's safe or malicious." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <span class="logo-shield">⛨</span>
+        <span>Phish<strong>Guard</strong></span>
+      </a>
+      <div class="nav-links">
+        <a href="#how">How It Works</a>
+        <a href="#models">Models</a>
+        <a href="https://github.com" target="_blank" class="btn-ghost">GitHub ↗</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    <div class="hero-inner">
+      <div class="hero-badge">🔒 ML-Powered · 549K URL Training Set</div>
+      <h1>Is this URL <span class="gradient-text">safe</span>?</h1>
+      <p class="hero-sub">Paste any link below. PhishGuard checks it against our machine learning model trained on over half a million URLs — instantly.</p>
+
+      <!-- CHECKER CARD -->
+      <div class="checker-card" id="checker">
+
+        <!-- URL INPUT -->
+        <div class="input-row">
+          <div class="input-wrap">
+            <span class="input-icon">🔗</span>
+            <input
+              type="url"
+              id="urlInput"
+              placeholder="https://example.com or paste any suspicious link..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button class="btn-clear" id="clearBtn" title="Clear" style="display:none">✕</button>
+          </div>
+          <button class="btn-check" id="checkBtn">
+            <span id="checkBtnText">Scan URL</span>
+            <span class="btn-spinner" id="checkSpinner" style="display:none"></span>
+          </button>
+        </div>
+
+        <!-- MODEL SELECTOR -->
+        <div class="model-selector">
+          <span class="selector-label">Model:</span>
+
+          <label class="model-pill" id="pill-mnb">
+            <input type="radio" name="model" value="mnb" checked />
+            <span class="pill-icon">🧠</span>
+            <span class="pill-name">Naive Bayes</span>
+            <span class="pill-badge best">BEST</span>
+          </label>
+
+          <label class="model-pill" id="pill-rf">
+            <input type="radio" name="model" value="rf" />
+            <span class="pill-icon">🌲</span>
+            <span class="pill-name">Random Forest</span>
+          </label>
+
+          <label class="model-pill" id="pill-lr">
+            <input type="radio" name="model" value="lr" />
+            <span class="pill-icon">📈</span>
+            <span class="pill-name">Logistic Regression</span>
+          </label>
+
+          <label class="model-pill model-pill-all" id="pill-all">
+            <input type="radio" name="model" value="all" />
+            <span class="pill-icon">⚡</span>
+            <span class="pill-name">Run All</span>
+          </label>
+        </div>
+
+        <!-- RESULT AREA -->
+        <div id="resultArea" class="result-area"></div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how">
+    <div class="section-inner">
+      <h2>How It Works</h2>
+      <p class="section-sub">Three steps from URL to verdict — happening in under a second.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <h3>Feature Extraction</h3>
+          <p>90,021 features are extracted: character-level n-grams, word-level n-grams, and 21 hand-crafted URL signals like entropy, suspicious TLDs, and IP-in-host.</p>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <h3>Model Inference</h3>
+          <p>Your chosen model (or all three) classifies the feature vector as phishing or safe, returning a probability score for each class.</p>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <h3>Verdict</h3>
+          <p>Results appear instantly with a confidence percentage. Use <em>Run All</em> to compare all three models side-by-side.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODELS SECTION -->
+  <section class="section section-dark" id="models">
+    <div class="section-inner">
+      <h2>The Models</h2>
+      <p class="section-sub">All three models are trained on the same feature pipeline — dual TF-IDF + 21 URL features — so comparisons are fair.</p>
+      <div class="model-cards">
+
+        <div class="model-card model-card-best">
+          <div class="model-card-badge">⭐ Best · Used by Extension</div>
+          <div class="model-card-icon">🧠</div>
+          <h3>Multinomial Naive Bayes</h3>
+          <div class="stat-grid">
+            <div class="stat"><span class="stat-val">94.69%</span><span class="stat-label">Accuracy</span></div>
+            <div class="stat"><span class="stat-val">98.84%</span><span class="stat-label">AUC-ROC</span></div>
+            <div class="stat"><span class="stat-val">94.98%</span><span class="stat-label">Precision</span></div>
+            <div class="stat"><span class="stat-val">85.89%</span><span class="stat-label">Recall</span></div>
+          </div>
+          <p class="model-desc">Fast, well-calibrated probabilistic classifier. Excellent AUC-ROC means it reliably ranks phishing above safe URLs.</p>
+        </div>
+
+        <div class="model-card">
+          <div class="model-card-icon">🌲</div>
+          <h3>Random Forest</h3>
+          <div class="stat-grid">
+            <div class="stat"><span class="stat-val">~97%</span><span class="stat-label">Accuracy</span></div>
+            <div class="stat"><span class="stat-val">—</span><span class="stat-label">AUC-ROC</span></div>
+            <div class="stat"><span class="stat-val">High</span><span class="stat-label">Precision</span></div>
+            <div class="stat"><span class="stat-val">High</span><span class="stat-label">Recall</span></div>
+          </div>
+          <p class="model-desc">Ensemble of 100 decision trees (max depth 20). Robust to overfitting. Slower at inference but often catches patterns MNB misses.</p>
+        </div>
+
+        <div class="model-card">
+          <div class="model-card-icon">📈</div>
+          <h3>Logistic Regression</h3>
+          <div class="stat-grid">
+            <div class="stat"><span class="stat-val">90.54%</span><span class="stat-label">Accuracy</span></div>
+            <div class="stat"><span class="stat-val">95.46%</span><span class="stat-label">AUC-ROC</span></div>
+            <div class="stat"><span class="stat-val">88.95%</span><span class="stat-label">Precision</span></div>
+            <div class="stat"><span class="stat-val">76.24%</span><span class="stat-label">Recall</span></div>
+          </div>
+          <p class="model-desc">Linear classifier with L2 regularisation. Most interpretable model — useful for understanding which URL features are most predictive.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-logo">⛨ PhishGuard</span>
+      <span>Trained on 549,346 URLs · <a href="https://www.kaggle.com/datasets/taruntiwarihp/phishing-site-urls" target="_blank">Dataset ↗</a></span>
+      <span>Also available as a <a href="#">Chrome Extension</a></span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

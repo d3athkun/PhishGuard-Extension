@@ -2,7 +2,11 @@
 predict.py
 ----------
 Prediction utility for the Flask API.
-Loads the trained MNB model + dual TF-IDF vectorizers once at startup.
+Loads all 3 trained models + shared dual TF-IDF vectorizers once at startup.
+
+Public API:
+    predict_url(url, model="mnb")  -> single result dict
+    predict_all(url)               -> dict with results from all 3 models
 """
 
 import re
@@ -13,11 +17,36 @@ import joblib
 from scipy.sparse import hstack, csr_matrix
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-_DIR           = os.path.dirname(os.path.abspath(__file__))
-model          = joblib.load(os.path.join(_DIR, "model.pkl"))
-char_vec       = joblib.load(os.path.join(_DIR, "char_vectorizer.pkl"))
-word_vec       = joblib.load(os.path.join(_DIR, "word_vectorizer.pkl"))
-print("[✓] Model and vectorizers loaded.")
+_DIR     = os.path.dirname(os.path.abspath(__file__))
+
+# Shared vectorizers
+char_vec = joblib.load(os.path.join(_DIR, "char_vectorizer.pkl"))
+word_vec = joblib.load(os.path.join(_DIR, "word_vectorizer.pkl"))
+
+# Load all 3 models
+_MODEL_FILES = {
+    "mnb": "model_mnb.pkl",
+    "lr":  "model_lr.pkl",
+    "rf":  "model_rf.pkl",
+}
+
+_MODELS = {}
+for key, fname in _MODEL_FILES.items():
+    fpath = os.path.join(_DIR, fname)
+    if os.path.exists(fpath):
+        _MODELS[key] = joblib.load(fpath)
+        print(f"[✓] Loaded model: {key} ({fname})")
+    else:
+        print(f"[!] Model file not found, skipping: {fname}")
+
+# Fallback: if individual files missing, use model.pkl for mnb
+if "mnb" not in _MODELS:
+    fallback = os.path.join(_DIR, "model.pkl")
+    if os.path.exists(fallback):
+        _MODELS["mnb"] = joblib.load(fallback)
+        print("[✓] Loaded model.pkl as MNB fallback")
+
+print(f"[✓] Vectorizers loaded. Available models: {list(_MODELS.keys())}")
 
 # ── Trusted base domains (bypass model — always safe) ─────────────────────────
 TRUSTED_DOMAINS = {
@@ -47,6 +76,12 @@ BRAND_CONTEXT = re.compile(
     r"netflix|ebay|bank|secure|login|verify|account|update|confirm)-", re.I
 )
 
+# ── Human-readable model names ────────────────────────────────────────────────
+MODEL_LABELS = {
+    "mnb": "Multinomial Naive Bayes",
+    "lr":  "Logistic Regression",
+    "rf":  "Random Forest",
+}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _get_base_domain(host: str) -> str:
@@ -106,31 +141,105 @@ def _hand_features(url: str) -> np.ndarray:
     return np.array(feats, dtype=float).reshape(1, -1)
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
-def predict_url(url: str) -> dict:
-    """
-    Returns:
-        {"label": "phishing"|"safe", "confidence": float, "url": str}
-    """
-    lo           = url.lower()
-    no_scheme    = re.sub(r"^https?://", "", lo)
-    host         = no_scheme.split("/")[0].split(":")[0]
-    base_domain  = _get_base_domain(host)
-
-    # Fast path: known-trusted domains
-    if base_domain in TRUSTED_DOMAINS:
-        return {"label": "safe", "confidence": 1.0, "url": url}
-
+def _build_features(url: str):
+    """Build the combined feature vector for a URL."""
     token_str = _tokenize(url)
     char_feat = char_vec.transform([token_str])
     word_feat = word_vec.transform([token_str])
     hand_feat = csr_matrix(_hand_features(url))
-    combined  = hstack([char_feat, word_feat, hand_feat])
+    return hstack([char_feat, word_feat, hand_feat])
 
-    pred_class = model.predict(combined)[0]
-    proba      = model.predict_proba(combined)[0]
 
+def _run_model(mdl, combined, url: str) -> dict:
+    """Run a single model and return a result dict."""
+    pred_class = mdl.predict(combined)[0]
+    proba      = mdl.predict_proba(combined)[0]
     label      = "phishing" if pred_class == 1 else "safe"
     confidence = float(round(float(max(proba)), 4))
-
     return {"label": label, "confidence": confidence, "url": url}
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+def predict_url(url: str, model: str = "mnb") -> dict:
+    """
+    Predict a single URL with the chosen model.
+
+    Args:
+        url:   URL to classify
+        model: "mnb" | "lr" | "rf"  (default: "mnb")
+
+    Returns:
+        {"label": "phishing"|"safe", "confidence": float, "url": str, "model": str}
+    """
+    model = model.lower().strip()
+    if model not in _MODELS:
+        available = list(_MODELS.keys())
+        raise ValueError(f"Unknown model '{model}'. Available: {available}")
+
+    lo          = url.lower()
+    no_scheme   = re.sub(r"^https?://", "", lo)
+    host        = no_scheme.split("/")[0].split(":")[0]
+    base_domain = _get_base_domain(host)
+
+    # Fast path: known-trusted domains
+    if base_domain in TRUSTED_DOMAINS:
+        return {
+            "label": "safe",
+            "confidence": 1.0,
+            "url": url,
+            "model": model,
+            "model_name": MODEL_LABELS.get(model, model),
+        }
+
+    combined   = _build_features(url)
+    result     = _run_model(_MODELS[model], combined, url)
+    result["model"]      = model
+    result["model_name"] = MODEL_LABELS.get(model, model)
+    return result
+
+
+def predict_all(url: str) -> dict:
+    """
+    Run all available models on a URL and return all results.
+
+    Returns:
+        {
+          "url": str,
+          "trusted": bool,
+          "results": {
+             "mnb": {"label": ..., "confidence": ..., "model_name": ...},
+             "lr":  {...},
+             "rf":  {...}
+          }
+        }
+    """
+    lo          = url.lower()
+    no_scheme   = re.sub(r"^https?://", "", lo)
+    host        = no_scheme.split("/")[0].split(":")[0]
+    base_domain = _get_base_domain(host)
+
+    # Fast path: known-trusted domains
+    if base_domain in TRUSTED_DOMAINS:
+        return {
+            "url": url,
+            "trusted": True,
+            "results": {
+                key: {
+                    "label": "safe",
+                    "confidence": 1.0,
+                    "model_name": MODEL_LABELS.get(key, key),
+                }
+                for key in _MODELS
+            },
+        }
+
+    combined = _build_features(url)
+    out = {"url": url, "trusted": False, "results": {}}
+    for key, mdl in _MODELS.items():
+        r = _run_model(mdl, combined, url)
+        out["results"][key] = {
+            "label":      r["label"],
+            "confidence": r["confidence"],
+            "model_name": MODEL_LABELS.get(key, key),
+        }
+    return out

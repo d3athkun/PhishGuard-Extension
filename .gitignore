@@ -12,11 +12,14 @@ build/
 venv/
 env/
 
-# Large ML model files — use Git LFS or download via train_model.py
-# Uncomment the lines below if you don't want to commit model files:
-# backend/model.pkl
-# backend/char_vectorizer.pkl
-# backend/word_vectorizer.pkl
+# Backend model files — committed to git (needed for Render deployment, ~18MB total)
+# backend/*.pkl files are intentionally tracked
+
+# Notebook model files (simple CountVectorizer pipeline — not used by backend API)
+phishing website/phishing_mnb.pkl
+phishing website/phishing_rf.pkl
+phishing website/phishing.pkl
+phishing website/vectorizer.pkl
 
 # Dataset — download via train_model.py (kagglehub)
 phishing website/phishing_site_urls.csv
