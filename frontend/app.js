@@ -3,7 +3,7 @@
  * Handles model selection, API calls, and result rendering.
  */
 
-const API_BASE = "http://localhost:5000"; // Update to Render.com URL after deployment
+const API_BASE = "https://phishguard-extension-9enx.onrender.com"; // Render production API
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const urlInput    = document.getElementById("urlInput");

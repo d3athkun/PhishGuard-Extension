@@ -42,6 +42,6 @@
 
   "host_permissions": [
     "http://localhost:5000/*",
-    "https://*.onrender.com/*"
+    "https://phishguard-extension-9enx.onrender.com/*"
   ]
 }

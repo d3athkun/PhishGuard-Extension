@@ -5,7 +5,7 @@
  * and the manual URL check (sends message to background.js).
  */
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = "https://phishguard-extension-9enx.onrender.com";
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const autoIcon = document.getElementById("autoIcon");

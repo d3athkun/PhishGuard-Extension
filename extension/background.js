@@ -8,7 +8,7 @@
  */
 
 // ── Config ───────────────────────────────────────────────────────────────────
-const API_BASE = "http://localhost:5000";  // ← change to your Render URL in production
+const API_BASE = "https://phishguard-extension-9enx.onrender.com";  // Render production API
 
 // ── Badge helpers ─────────────────────────────────────────────────────────────
 function setBadge(tabId, label, confidence) {
