@@ -159,6 +159,66 @@ def _run_model(mdl, combined, url: str) -> dict:
     return {"label": label, "confidence": confidence, "url": url}
 
 
+def _explain(url: str) -> list:
+    """
+    Return a list of human-readable reasons why a URL looks suspicious.
+    Based purely on the 21 hand-crafted features — no ML needed.
+    Returns at most 5 most relevant signals.
+    """
+    lo          = url.lower()
+    no_scheme   = re.sub(r"^https?://", "", lo)
+    parts       = no_scheme.split("/", 1)
+    host        = parts[0]
+    path        = parts[1] if len(parts) > 1 else ""
+    host_np     = host.split(":")[0]          # host without port
+    subdomains  = host_np.split(".")
+    query       = path.split("?", 1)[1] if "?" in path else ""
+    entropy     = _entropy(host_np)
+
+    reasons = []
+
+    if SUSPICIOUS_TLDS.search(lo):
+        tld = re.search(r"\.(\w+)(?:/|$)", host_np)
+        tld_str = f".{tld.group(1)}" if tld else "suspicious TLD"
+        reasons.append(f"Uses a high-risk domain extension ({tld_str}) commonly associated with phishing")
+
+    if BRAND_CONTEXT.search(host_np):
+        reasons.append("Contains a trusted brand name in a suspicious hyphenated context (e.g. paypal-login.xyz)")
+
+    if re.search(r"\d{1,3}(\.\d{1,3}){3}", host_np):
+        reasons.append("Hostname is a raw IP address — legitimate sites use domain names")
+
+    if not lo.startswith("https"):
+        reasons.append("Connection is not encrypted (HTTP, not HTTPS)")
+
+    if SHORTENERS.search(host_np):
+        reasons.append("URL uses a shortener service that hides the real destination")
+
+    if entropy > 4.2:
+        reasons.append(f"Hostname looks randomly generated (high entropy: {entropy:.2f}) — typical of auto-created phishing domains")
+
+    if url.count("-") > 4:
+        reasons.append(f"Unusually high number of hyphens ({url.count('-')}) in the URL")
+
+    if max(0, len(subdomains) - 2) > 2:
+        reasons.append(f"Deep subdomain structure ({max(0, len(subdomains)-2)} levels) used to disguise the real domain")
+
+    if url.count("@") > 0:
+        reasons.append("Contains @ symbol — can be used to redirect to a different host")
+
+    if url.count("%") > 3:
+        reasons.append(f"Contains {url.count('%')} hex-encoded characters — often used to obfuscate malicious URLs")
+
+    if len(url) > 100:
+        reasons.append(f"Unusually long URL ({len(url)} characters) — often used to hide the real destination")
+
+    if len(query.split("&")) > 5 if query else False:
+        reasons.append(f"Large number of query parameters ({len(query.split('&'))}) which may be used for tracking or obfuscation")
+
+    # Return top 5 most relevant (first matched = highest priority)
+    return reasons[:5] if reasons else ["URL pattern matches known phishing characteristics based on ML analysis"]
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 def predict_url(url: str, model: str = "mnb") -> dict:
     """
@@ -195,6 +255,8 @@ def predict_url(url: str, model: str = "mnb") -> dict:
     result     = _run_model(_MODELS[model], combined, url)
     result["model"]      = model
     result["model_name"] = MODEL_LABELS.get(model, model)
+    if result["label"] == "phishing":
+        result["explanation"] = _explain(url)
     return result
 
 
@@ -207,7 +269,7 @@ def predict_all(url: str) -> dict:
           "url": str,
           "trusted": bool,
           "results": {
-             "mnb": {"label": ..., "confidence": ..., "model_name": ...},
+             "mnb": {"label": ..., "confidence": ..., "model_name": ..., "explanation": [...]},
              "lr":  {...},
              "rf":  {...}
           }
@@ -233,13 +295,17 @@ def predict_all(url: str) -> dict:
             },
         }
 
-    combined = _build_features(url)
+    combined    = _build_features(url)
+    explanation = _explain(url)   # compute once, shared across all models
     out = {"url": url, "trusted": False, "results": {}}
     for key, mdl in _MODELS.items():
         r = _run_model(mdl, combined, url)
-        out["results"][key] = {
+        entry = {
             "label":      r["label"],
             "confidence": r["confidence"],
             "model_name": MODEL_LABELS.get(key, key),
         }
+        if r["label"] == "phishing":
+            entry["explanation"] = explanation
+        out["results"][key] = entry
     return out

@@ -78,12 +78,20 @@ async function runSingle(url, model) {
 }
 
 function renderSingle(data) {
-  const { label, confidence, url, model_name } = data;
+  const { label, confidence, url, model_name, explanation } = data;
   const isSafe    = label === "safe";
   const pct       = Math.round(confidence * 100);
   const icon      = isSafe ? "✅" : "🚨";
   const verdict   = isSafe ? "Safe" : "Phishing Detected";
   const cls       = isSafe ? "safe" : "phishing";
+
+  const explainHtml = (!isSafe && explanation && explanation.length) ? `
+    <div class="explain-wrap">
+      <button class="explain-toggle-btn" onclick="toggleExplain(this)">Why was this flagged? ▾</button>
+      <ul class="explain-items" style="display:none">
+        ${explanation.map(r => `<li>${escHtml(r)}</li>`).join("")}
+      </ul>
+    </div>` : "";
 
   resultArea.innerHTML = `
     <div class="result-card ${cls}">
@@ -101,10 +109,10 @@ function renderSingle(data) {
             <div class="conf-bar-fill" style="width: 0%"></div>
           </div>
         </div>
+        ${explainHtml}
       </div>
     </div>`;
 
-  // Animate the bar after paint
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       resultArea.querySelector(".conf-bar-fill").style.width = pct + "%";
@@ -130,14 +138,17 @@ function renderAll(data) {
   const icons   = { mnb: "🧠", rf: "🌲", lr: "📈" };
 
   // Tally votes
-  const votes   = Object.values(results).map(r => r.label);
-  const phCount = votes.filter(v => v === "phishing").length;
+  const votes    = Object.values(results).map(r => r.label);
+  const phCount  = votes.filter(v => v === "phishing").length;
   const safeCount = votes.length - phCount;
   const majority  = phCount >= safeCount ? "phishing" : "safe";
   const summaryIcon = majority === "phishing" ? "⚠️" : "✅";
   const summaryTxt  = majority === "phishing"
     ? `${phCount} of ${votes.length} models flagged this URL as <strong style="color:var(--red)">phishing</strong>.`
     : `${safeCount} of ${votes.length} models consider this URL <strong style="color:var(--green)">safe</strong>.`;
+
+  // Shared explanation (from whichever model returned it first)
+  const sharedExplanation = Object.values(results).find(r => r.explanation)?.explanation || [];
 
   const cards = order.filter(k => results[k]).map(key => {
     const r       = results[key];
@@ -158,14 +169,23 @@ function renderAll(data) {
       </div>`;
   }).join("");
 
+  // Shared explain block shown below the grid (only if any model detected phishing)
+  const explainHtml = (phCount > 0 && sharedExplanation.length) ? `
+    <div class="explain-wrap" style="border-top:1px solid rgba(248,81,73,.2); padding-top:10px; margin-top:12px">
+      <button class="explain-toggle-btn" onclick="toggleExplain(this)">Why was this flagged? ▾</button>
+      <ul class="explain-items" style="display:none">
+        ${sharedExplanation.map(r => `<li>${escHtml(r)}</li>`).join("")}
+      </ul>
+    </div>` : "";
+
   resultArea.innerHTML = `
     <div class="run-all-wrap">
       <div class="run-all-title">Results for: <code style="color:var(--accent-1)">${escHtml(url)}</code></div>
       <div class="run-all-grid">${cards}</div>
       <div class="ra-summary">${summaryIcon} ${summaryTxt}</div>
+      ${explainHtml}
     </div>`;
 
-  // Animate bars
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       resultArea.querySelectorAll(".ra-bar-fill").forEach(bar => {
@@ -174,6 +194,14 @@ function renderAll(data) {
       });
     });
   });
+}
+
+// ── Explain toggle (global, called from inline onclick) ───────────────────────
+function toggleExplain(btn) {
+  const list = btn.nextElementSibling;
+  const open = list.style.display === "none";
+  list.style.display = open ? "flex" : "none";
+  btn.textContent    = open ? "Why was this flagged? ▴" : "Why was this flagged? ▾";
 }
 
 // ── Error ─────────────────────────────────────────────────────────────────────

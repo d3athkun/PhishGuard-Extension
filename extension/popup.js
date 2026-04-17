@@ -8,22 +8,29 @@
 const API_BASE = "https://phishguard-extension-9enx.onrender.com";
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const autoIcon = document.getElementById("autoIcon");
-const autoLabel = document.getElementById("autoLabel");
-const autoUrl = document.getElementById("autoUrl");
-const autoBarWrap = document.getElementById("autoBarWrap");
-const autoBarFill = document.getElementById("autoBarFill");
-const autoConfValue = document.getElementById("autoConfValue");
+const autoIcon        = document.getElementById("autoIcon");
+const autoLabel       = document.getElementById("autoLabel");
+const autoUrl         = document.getElementById("autoUrl");
+const autoBarWrap     = document.getElementById("autoBarWrap");
+const autoBarFill     = document.getElementById("autoBarFill");
+const autoConfValue   = document.getElementById("autoConfValue");
+const autoExplainWrap = document.getElementById("autoExplainWrap");
+const autoExplainList = document.getElementById("autoExplainList");
+const autoExplainToggle = document.getElementById("autoExplainToggle");
 
-const urlInput = document.getElementById("urlInput");
-const checkBtn = document.getElementById("checkBtn");
-const manualResultWrap = document.getElementById("manualResultWrap");
-const manualLoading = document.getElementById("manualLoading");
-const manualIcon = document.getElementById("manualIcon");
-const manualLabel = document.getElementById("manualLabel");
-const manualUrl = document.getElementById("manualUrl");
-const manualBarFill = document.getElementById("manualBarFill");
-const manualConfValue = document.getElementById("manualConfValue");
+const urlInput          = document.getElementById("urlInput");
+const checkBtn          = document.getElementById("checkBtn");
+const manualResultWrap  = document.getElementById("manualResultWrap");
+const manualLoading     = document.getElementById("manualLoading");
+const manualIcon        = document.getElementById("manualIcon");
+const manualLabel       = document.getElementById("manualLabel");
+const manualUrl         = document.getElementById("manualUrl");
+const manualBarFill     = document.getElementById("manualBarFill");
+const manualConfValue   = document.getElementById("manualConfValue");
+const manualExplainWrap = document.getElementById("manualExplainWrap");
+const manualExplainList = document.getElementById("manualExplainList");
+const manualExplainToggle = document.getElementById("manualExplainToggle");
+
 const apiDot = document.getElementById("apiDot");
 
 // ── SVG icons ─────────────────────────────────────────────────────────────────
@@ -37,22 +44,39 @@ const ICON_PHISHING = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3
   <path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
 </svg>`;
 
-const ICON_OFFLINE = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-
+const ICON_OFFLINE  = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 const ICON_SCANNING = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"/></svg>`;
 
-// ── Render helpers ─────────────────────────────────────────────────────────────
-function renderResult({ iconEl, labelEl, urlEl, barFillEl, confEl, barWrapEl }, result) {
-    const isPhishing = result.label === "phishing";
-    const isOffline = result.label === "offline";
-    const pct = Math.round(result.confidence * 100);
+// ── Explain toggle factory ────────────────────────────────────────────────────
+function setupExplainToggle(toggleBtn, listEl) {
+    let open = false;
+    toggleBtn.addEventListener("click", () => {
+        open = !open;
+        listEl.style.display = open ? "flex" : "none";
+        toggleBtn.textContent = open
+            ? "Why was this flagged? ▴"
+            : "Why was this flagged? ▾";
+    });
+}
 
-    iconEl.innerHTML = isPhishing ? ICON_PHISHING : isOffline ? ICON_OFFLINE : ICON_SAFE;
-    iconEl.className = `result-icon ${isPhishing ? "danger" : isOffline ? "offline" : "safe"}`;
+setupExplainToggle(autoExplainToggle,   autoExplainList);
+setupExplainToggle(manualExplainToggle, manualExplainList);
+
+// ── Render helpers ─────────────────────────────────────────────────────────────
+function renderResult(
+    { iconEl, labelEl, urlEl, barFillEl, confEl, barWrapEl, explainWrapEl, explainListEl },
+    result
+) {
+    const isPhishing = result.label === "phishing";
+    const isOffline  = result.label === "offline";
+    const pct        = Math.round(result.confidence * 100);
+
+    iconEl.innerHTML  = isPhishing ? ICON_PHISHING : isOffline ? ICON_OFFLINE : ICON_SAFE;
+    iconEl.className  = `result-icon ${isPhishing ? "danger" : isOffline ? "offline" : "safe"}`;
 
     labelEl.textContent = isPhishing ? "⚠ Phishing Detected"
-        : isOffline ? "API Offline"
-            : "✓ Safe";
+        : isOffline      ? "API Offline"
+        :                  "✓ Safe";
     labelEl.className = `result-label ${isPhishing ? "danger" : isOffline ? "" : "safe"}`;
 
     if (urlEl && result.url) {
@@ -63,16 +87,32 @@ function renderResult({ iconEl, labelEl, urlEl, barFillEl, confEl, barWrapEl }, 
 
     if (!isOffline && barWrapEl) {
         barWrapEl.style.display = "flex";
-        barFillEl.style.width = `${pct}%`;
-        barFillEl.className = `confidence-bar-fill ${isPhishing ? "danger" : "safe"}`;
-        confEl.textContent = `${pct}%`;
+        barFillEl.style.width   = `${pct}%`;
+        barFillEl.className     = `confidence-bar-fill ${isPhishing ? "danger" : "safe"}`;
+        confEl.textContent      = `${pct}%`;
+    }
+
+    // ── Explanation (only shown on phishing, collapsed by default) ────────────
+    if (explainWrapEl && explainListEl) {
+        if (isPhishing && result.explanation && result.explanation.length) {
+            explainWrapEl.style.display = "block";
+            explainListEl.style.display = "none"; // collapsed by default
+            explainListEl.innerHTML = result.explanation
+                .map(r => `<li>${r}</li>`)
+                .join("");
+            // Reset toggle arrow
+            const toggleBtn = explainWrapEl.querySelector(".explain-toggle");
+            if (toggleBtn) toggleBtn.textContent = "Why was this flagged? ▾";
+        } else {
+            explainWrapEl.style.display = "none";
+        }
     }
 }
 
 // ── Check API health ───────────────────────────────────────────────────────────
 async function checkApiHealth() {
     try {
-        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
+        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
         apiDot.className = res.ok ? "status-dot online" : "status-dot offline";
     } catch {
         apiDot.className = "status-dot offline";
@@ -95,12 +135,14 @@ async function loadAutoScan() {
             return;
         }
         renderResult({
-            iconEl: autoIcon,
-            labelEl: autoLabel,
-            urlEl: null,
-            barFillEl: autoBarFill,
-            confEl: autoConfValue,
-            barWrapEl: autoBarWrap,
+            iconEl:        autoIcon,
+            labelEl:       autoLabel,
+            urlEl:         null,
+            barFillEl:     autoBarFill,
+            confEl:        autoConfValue,
+            barWrapEl:     autoBarWrap,
+            explainWrapEl: autoExplainWrap,
+            explainListEl: autoExplainList,
         }, result);
     });
 }
@@ -112,8 +154,9 @@ async function doManualCheck() {
     if (!url.startsWith("http://") && !url.startsWith("https://")) url = "http://" + url;
 
     checkBtn.disabled = true;
-    manualLoading.style.display = "flex";
-    manualResultWrap.style.display = "none";
+    manualLoading.style.display     = "flex";
+    manualResultWrap.style.display  = "none";
+    manualExplainWrap.style.display = "none";
 
     chrome.runtime.sendMessage({ type: "MANUAL_SCAN", url }, (response) => {
         manualLoading.style.display = "none";
@@ -123,16 +166,22 @@ async function doManualCheck() {
             manualResultWrap.style.display = "block";
             renderResult({
                 iconEl: manualIcon, labelEl: manualLabel, urlEl: manualUrl,
-                barFillEl: manualBarFill, confEl: manualConfValue, barWrapEl: null,
+                barFillEl: manualBarFill, confEl: manualConfValue,
+                barWrapEl: null, explainWrapEl: manualExplainWrap, explainListEl: manualExplainList,
             }, { label: "offline", confidence: 0, url });
             return;
         }
 
         manualResultWrap.style.display = "block";
         renderResult({
-            iconEl: manualIcon, labelEl: manualLabel, urlEl: manualUrl,
-            barFillEl: manualBarFill, confEl: manualConfValue,
-            barWrapEl: manualResultWrap.querySelector(".confidence-bar-wrap"),
+            iconEl:        manualIcon,
+            labelEl:       manualLabel,
+            urlEl:         manualUrl,
+            barFillEl:     manualBarFill,
+            confEl:        manualConfValue,
+            barWrapEl:     manualResultWrap.querySelector(".confidence-bar-wrap"),
+            explainWrapEl: manualExplainWrap,
+            explainListEl: manualExplainList,
         }, response.result);
     });
 }
