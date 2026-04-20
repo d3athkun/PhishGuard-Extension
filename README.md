@@ -198,4 +198,4 @@ GET /health  →  { "status": "ok" }
 - [ ] Add Random Forest to backend pipeline
 - [ ] Page content scanning (HTML/JS analysis)
 - [ ] User allowlist/blocklist
-- [ ] Chrome Web Store submission
+- [ ] Chrome Web Store submission.
