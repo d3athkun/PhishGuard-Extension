@@ -8,3 +8,4 @@ joblib
 matplotlib
 kagglehub
 gunicorn
+python-whois

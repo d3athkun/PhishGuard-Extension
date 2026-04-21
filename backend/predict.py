@@ -12,8 +12,12 @@ Public API:
 import re
 import os
 import math
+import time
+import threading
 import numpy as np
 import joblib
+from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from scipy.sparse import hstack, csr_matrix
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -58,7 +62,7 @@ TRUSTED_DOMAINS = {
     "twitter.com","x.com","linkedin.com",
     "reddit.com","wikipedia.org","github.com","stackoverflow.com",
     "paypal.com","ebay.com","netflix.com","spotify.com",
-    "yahoo.com","cloudflare.com","amazonaws.com",
+    "yahoo.com","cloudflare.com","amazonaws.com","amazon.in","amazon.co.in","amazon.com","claude.ai","chatgpt.ai"
 }
 
 # ── Regex constants ───────────────────────────────────────────────────────────
@@ -219,6 +223,103 @@ def _explain(url: str) -> list:
     return reasons[:5] if reasons else ["URL pattern matches known phishing characteristics based on ML analysis"]
 
 
+# ── Domain Age — WHOIS lookup ─────────────────────────────────────────────────
+_AGE_CACHE      = {}          # {host: (age_days_or_None, fetched_at)}
+_AGE_CACHE_LOCK = threading.Lock()
+_AGE_CACHE_TTL  = 3600        # seconds (1 hour)
+_WHOIS_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="whois")
+
+
+def _whois_lookup(host: str):
+    """Raw WHOIS call — runs in a thread so we can apply a timeout."""
+    try:
+        import whois                        # lazy import — not always installed
+        w = whois.whois(host)
+        cd = w.creation_date
+        if isinstance(cd, list):
+            cd = cd[0]
+        if cd is None:
+            return None
+        if cd.tzinfo is None:
+            cd = cd.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - cd).days
+    except Exception:
+        return None
+
+
+def _get_domain_age_days(host: str) -> int | None:
+    """
+    Returns domain age in days via WHOIS, or None if lookup fails/times out.
+    Results are cached for 1 hour.
+    """
+    now = time.time()
+    with _AGE_CACHE_LOCK:
+        if host in _AGE_CACHE:
+            age_days, fetched_at = _AGE_CACHE[host]
+            if now - fetched_at < _AGE_CACHE_TTL:
+                return age_days
+
+    try:
+        future = _WHOIS_EXECUTOR.submit(_whois_lookup, host)
+        age_days = future.result(timeout=5)
+    except (FuturesTimeout, Exception):
+        age_days = None
+
+    with _AGE_CACHE_LOCK:
+        _AGE_CACHE[host] = (age_days, time.time())
+
+    return age_days
+
+
+def _apply_domain_age(result: dict, host: str, url: str) -> dict:
+    """
+    Post-ML adjustment based on domain age.
+    Modifies result in-place and returns it.
+
+    Rules:
+      < 30 days  → override to phishing (strong signal) regardless of ML verdict
+      30–90 days → if already phishing, add age as supporting evidence
+      > 90 days  → no change
+      None       → WHOIS failed, ignore
+    """
+    age = _get_domain_age_days(host)
+    if age is None:
+        # WHOIS unavailable — still build explanation from URL features if phishing
+        if result["label"] == "phishing":
+            result.setdefault("explanation", _explain(url))
+        return result
+
+    result["domain_age_days"] = age
+
+    if age < 30:
+        # Very new domain — high confidence phishing signal
+        if result["label"] == "safe":
+            result["label"]      = "phishing"
+            result["confidence"] = round(max(result["confidence"], 0.78), 4)
+        age_reason = (
+            f"Domain registered only {age} day{'s' if age != 1 else ''} ago — "
+            f"newly registered domains are a primary indicator of phishing attacks"
+        )
+        existing = _explain(url)
+        result["explanation"] = [age_reason] + existing[:4]   # age first, then URL signals
+
+    elif age < 90:
+        # Relatively new — add as supporting evidence if ML already flagged it
+        if result["label"] == "phishing":
+            existing = _explain(url)
+            age_reason = (
+                f"Domain is relatively new ({age} days old) — "
+                f"phishing sites frequently use recently registered domains"
+            )
+            result["explanation"] = existing[:4] + [age_reason]
+    else:
+        # Established domain — ML result stands, build explanation normally
+        if result["label"] == "phishing":
+            result.setdefault("explanation", _explain(url))
+
+    return result
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 def predict_url(url: str, model: str = "mnb") -> dict:
     """
@@ -255,8 +356,8 @@ def predict_url(url: str, model: str = "mnb") -> dict:
     result     = _run_model(_MODELS[model], combined, url)
     result["model"]      = model
     result["model_name"] = MODEL_LABELS.get(model, model)
-    if result["label"] == "phishing":
-        result["explanation"] = _explain(url)
+    # Domain age check — may override label or enrich explanation
+    result = _apply_domain_age(result, host, url)
     return result
 
 
@@ -296,16 +397,17 @@ def predict_all(url: str) -> dict:
         }
 
     combined    = _build_features(url)
-    explanation = _explain(url)   # compute once, shared across all models
     out = {"url": url, "trusted": False, "results": {}}
     for key, mdl in _MODELS.items():
         r = _run_model(mdl, combined, url)
-        entry = {
+        r["model"]      = key
+        r["model_name"] = MODEL_LABELS.get(key, key)
+        r = _apply_domain_age(r, host, url)
+        out["results"][key] = {
             "label":      r["label"],
             "confidence": r["confidence"],
-            "model_name": MODEL_LABELS.get(key, key),
+            "model_name": r["model_name"],
         }
-        if r["label"] == "phishing":
-            entry["explanation"] = explanation
-        out["results"][key] = entry
+        if r["label"] == "phishing" and "explanation" in r:
+            out["results"][key]["explanation"] = r["explanation"]
     return out
